@@ -55,8 +55,6 @@
                             (thing-at-point 'word)) "]: ")
                   nil nil
                   (thing-at-point 'word)))))
-
-
     (cond
      ((eq arg 1)
       (deferred:$
