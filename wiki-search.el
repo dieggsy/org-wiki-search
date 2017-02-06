@@ -2,10 +2,10 @@
 
 ;; Copyright (C) 2017 Diego A. Mundo
 ;; Author: Diego A. Mundo <diegoamundo@gmail.com>
-;; URL: http://github.com/therockmandolinist/emacs-hacker-typer
-;; Git-Repository: git://github.com/therockmandolinist/emacs-hacker-typer.git
+;; URL:
+;; Git-Repository:
 ;; Created: 2016-01-20
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Keywords: reference search wiki
 ;; Package-Requires: ((emacs "24") (cl-lib "0.5") (deferred "0.5.0") (request-deferred "0.3.0") (org "8.2.10") (toc-org "20170131.558"))
 
@@ -27,11 +27,6 @@
 
 ;;; Commentary:
 
-;; This package provides a customizable implementation of hackertyper.com in
-;; Emacs for your amusement. It opens a buffer in which typing any letter
-;; inserts a piece of a specified or randomly chosen script. It can also pull
-;; up a picture of "hackerman" on command.
-
 ;;; Code:
 
 (require 'request-deferred)
@@ -39,77 +34,64 @@
 (require 'cl-lib)
 (require 'org)
 
-(defvar wiki-search--stack '()
-  "Search history. Internal.")
+(defcustom wiki-search-window-select t
+  "Wether to select wiki window."
+  :group 'wiki-search
+  :type 'boolean)
 
 ;;;###autoload
-(defun wiki-search (arg &optional search-term back forward action)
+(defun wiki-search (arg &optional search-term)
   "Search wikipedia."
-  (interactive "p")
-  (let ((input (if search-term
-                   search-term
-                 (read-string
-                  (concat "Search wiki ["
-                          (if (region-active-p)
-                              (buffer-substring (region-beginning) (region-end))
-                            (thing-at-point 'word)) "]: ")
-                  nil nil
-                  (thing-at-point 'word)))))
-    (cond
-     ((eq arg 1)
-      (deferred:$
-        (request-deferred
-         "https://en.wikipedia.org/w/api.php"
-         :type "GET"
-         :parser 'json-read
-         :params `(("action" . "query")
-                   ("prop" . "extracts")
-                   ("format" . "json")
-                   ("redirects" . "")
-                   ("exintro" . "")
-                   ("explaintext" . "")
-                   ("titles" . ,input)))
-        (deferred:nextc it
-          (lambda (response)
-            (let* ((json-data (request-response-data response))
-                   (title (cdr (wiki-search--assoc-find-key 'to json-data)))
-                   (content (cdr (wiki-search--assoc-find-key 'extract json-data))))
-
-              (when (get-buffer "*wiki*")
-                (kill-buffer "*wiki*"))
-              (get-buffer-create "*wiki*")
-              (with-current-buffer "*wiki*"
-                (org-mode)
-                (evil-motion-state)
-                (insert (concat "#+TITLE: " input "\n"))
-                (insert content)
-                (insert (format "\n[[elisp:(wiki-search\"4\"\"%s\")][Read more]]" input))
-                (goto-char (point-min))
-                (while (re-search-forward "\n" nil t)
-                  (replace-match "\n\n"))
-                (fill-region (point-min) (point-max))
-                (define-key (current-local-map) (kbd "q") #'quit-window))
-              (display-buffer "*wiki*" (when search-term '(display-buffer-same-window . nil))))))))
-     ((or (eq arg 4) (eq (string-to-number arg) 4))
-      (deferred:$
-        (request-deferred
-         "https://en.wikipedia.org/w/api.php"
-         :type "GET"
-         :parser 'json-read
-         :params `(("action" . "query")
-                   ("prop" . "revisions")
-                   ("rvprop" . "content")
-                   ("format" . "json")
-                   ("redirects" . "")
-                   ("titles" . ,input)))
-        (deferred:nextc it
-          (lambda (response)
-            (let* ((json-data (request-response-data response))
-                   (title (cdr (wiki-search--assoc-find-key 'title json-data)))
-                   (content (cdr (wiki-search--assoc-find-key '* json-data))))
-              (when (get-buffer "*wiki*")
-                (kill-buffer "*wiki*"))
-              (get-buffer-create "*wiki*")
+  (interactive "P")
+  (let* ((input (if search-term
+                    search-term
+                  (read-string
+                   (concat "Search wiki ["
+                           (if (region-active-p)
+                               (buffer-substring (region-beginning) (region-end))
+                             (thing-at-point 'word)) "]: ")
+                   nil nil
+                   (thing-at-point 'word))))
+         (params (if arg
+                     `(("action" . "query")
+                       ("prop" . "revisions")
+                       ("rvprop" . "content")
+                       ("format" . "json")
+                       ("redirects" . "")
+                       ("titles" . ,input))
+                   `(("action" . "query")
+                     ("prop" . "extracts")
+                     ("format" . "json")
+                     ("redirects" . "")
+                     ("exintro" . "")
+                     ("explaintext" . "")
+                     ("titles" . ,input)))))
+    (deferred:$
+      (request-deferred
+       "https://en.wikipedia.org/w/api.php"
+       :type "GET"
+       :parser 'json-read
+       :params params)
+      (deferred:nextc it
+        (lambda (response)
+          (let* ((json-data (request-response-data response))
+                 (title (cdr (wiki-search--assoc-find-key 'title json-data)))
+                 (content (cdr (wiki-search--assoc-find-key (if arg '* 'extract) json-data))))
+            (when (get-buffer "*wiki*")
+              (kill-buffer "*wiki*"))
+            (get-buffer-create "*wiki*")
+            (if (not arg)
+                (with-current-buffer "*wiki*"
+                  (org-mode)
+                  (evil-motion-state)
+                  (insert (concat "#+TITLE: " input "\n"))
+                  (insert content)
+                  (insert (format "\n[[elisp:(wiki-search\"4\"\"%s\")][Read more]]" input))
+                  (goto-char (point-min))
+                  (while (re-search-forward "\n" nil t)
+                    (replace-match "\n\n"))
+                  (fill-region (point-min) (point-max))
+                  (define-key (current-local-map) (kbd "q") #'quit-window))
               (with-current-buffer "*wiki*"
                 (let ((inhibit-redisplay (when search-term t)))
                   (insert content)
@@ -123,10 +105,12 @@
                   (goto-char (point-min))
                   (insert "#+TITLE: ")
                   (dolist (reps '(("\n\\*\\*" . "\n*")
-                                  ("\\[\\[file:\\([^]]+?\\)\\]\\]" . "[[elisp:(wiki-search 4 \"\\1\")][\\1]]" )
-                                  ("\\[\\[file:\\([^]]+?\\)\\]\\[\\([^]]+?\\)\\]\\]" . "[[elisp:(wiki-search\"\\1\")][\\2]]")
+                                  ("\\[\\[file:\\([^]]+?\\)\\]\\]" . "[[elisp:(wiki-search\"4\"\"\\1\")][\\1]]" )
+                                  ("\\[\\[file:\\([^]]+?\\)\\]\\[\\([^]]+?\\)\\]\\]" . "[[elisp:(wiki-search\"4\"\"\\1\")][\\2]]")
                                   ("\\[\\[\\(Category:[^]]+?\\)\\]\\[\\([^]]+?\\)\\]\\]" . "[[https://en.wikipedia.org/wiki/\\1][\\2]]")
                                   ("elisp:(wiki-search \"\\(.*?\\.\\(jpg\\|png\\)\\)\")" . "https://en.wikipedia.org/wiki/file:\\1")
+                                  ("@@mediawiki{{lang-.\\{2\\}?|link=yes|\\(.*?\\)}}@@". "\\1")
+                                  ("@@mediawiki\\(.\\|\n\\)+?@@" . "")
                                   ("-  " . "- ")))
                     (goto-char (point-min))
                     (while (re-search-forward (car reps) nil t)
@@ -142,8 +126,10 @@
                   (fill-region (point-min) (point-max))
                   (org-global-cycle t)
                   (define-key (current-local-map) (kbd "q") #'quit-window)
-                  (read-only-mode)))
-              (display-buffer "*wiki*" (when search-term '(display-buffer-same-window . nil)))))))))))
+                  (read-only-mode))))
+            (display-buffer "*wiki*" (when search-term '(display-buffer-same-window . nil)))
+            (when (and wiki-search-window-select (not (stringp arg)))
+              (other-window 1))))))))
 
 ;;; utils
 
