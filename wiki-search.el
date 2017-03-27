@@ -7,7 +7,7 @@
 ;; Created: 2016-01-20
 ;; Version: 0.2.0
 ;; Keywords: reference search wiki
-;; Package-Requires: ((emacs "24") (cl-lib "0.5") (deferred "0.5.0") (request-deferred "0.3.0") (org "8.2.10") (toc-org "20170131.558"))
+;; Package-Requires: ((emacs "24.3") (cl-lib "0.5") (deferred "0.5.0") (request-deferred "0.3.0") (org "8.2.10") (toc-org "20170131.558"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -41,7 +41,9 @@
 
 ;;;###autoload
 (defun wiki-search (arg &optional search-term)
-  "Search wikipedia."
+  "Provide wikipedia summary for given SEARCH-TERM.
+
+With prefix argument ARG, go straight to full page in `org-mode' format."
   (interactive "P")
   (let* ((input (if search-term
                     search-term
@@ -83,7 +85,7 @@
             (if (not arg)
                 (with-current-buffer "*wiki*"
                   (org-mode)
-                  (evil-motion-state)
+                  (and (featurep 'evil) (evil-motion-state))
                   (insert (concat "#+TITLE: " input "\n"))
                   (insert content)
                   (insert (format "\n[[elisp:(wiki-search\"4\"\"%s\")][Read more]]" input))
@@ -121,7 +123,7 @@
                   (insert "Contents")
                   (org-set-tags-to ":toc:TOC_3:")
                   (toc-org-insert-toc)
-                  (evil-motion-state)
+                  (and (featurep 'evil) (evil-motion-state))
                   (outline-show-all)
                   (fill-region (point-min) (point-max))
                   (org-global-cycle t)
@@ -134,7 +136,7 @@
 ;;; utils
 
 (defun wiki-search--assoc-find-key (key tree)
-  "Return cons with given key in nested assoc list."
+  "Return cons with given KEY in nested assoc list TREE."
   (cond ((consp tree)
          (cl-destructuring-bind (x . y)  tree
            (if (eql x key) tree
