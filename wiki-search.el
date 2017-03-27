@@ -5,9 +5,9 @@
 ;; URL:
 ;; Git-Repository:
 ;; Created: 2016-01-20
-;; Version: 0.2.0
+;; Version: 0.2.2
 ;; Keywords: reference search wiki
-;; Package-Requires: ((emacs "24.3") (cl-lib "0.5") (deferred "0.5.0") (request-deferred "0.3.0") (org "8.2.10") (toc-org "20170131.558"))
+;; Package-Requires: ((emacs "24.3") (cl-lib "0.5") (deferred "0.5.0") (request-deferred "0.3.0") (org "8.2.10") (toc-org "20170324.103"))
 
 ;; This file is not part of GNU Emacs.
 
